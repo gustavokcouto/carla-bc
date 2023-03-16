@@ -107,10 +107,18 @@ class CarlaMultiAgentEnv(gym.Env):
         # get obeservations
         obs_dict = self._om_handler.get_observation(self.timestamp)
         return obs_dict
-
+    
+    def tick_scenario(self):
+        spectator = self._world.get_spectator()
+        spectator.set_transform(
+            carla.Transform(
+                self._ev_handler.ego_vehicles['hero'].vehicle.get_location() + carla.Location(z=50),
+                carla.Rotation(pitch=-90)))
+            
     def step(self, control_dict):
         self._ev_handler.apply_control(control_dict)
         self._sa_handler.tick()
+        self.tick_scenario()
         # tick world
         self._world.tick()
 
