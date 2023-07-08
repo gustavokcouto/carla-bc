@@ -122,18 +122,19 @@ def learn_bc(policy, device, expert_loader, eval_loader, env, resume_last_train)
             wandb.log(avg_route_completion, step=i_steps)
             steps_last_eval = i_steps
 
+        train_init_kwargs = {
+            'start_ep': i_episode,
+            'i_steps': i_steps
+        }
         if min_eval_loss > eval_loss:
             ckpt_path = (ckpt_dir / f'bc_ckpt_{i_episode}_min_eval.pth').as_posix()
             th.save(
-                {'policy_state_dict': policy.state_dict()},
+                {'policy_state_dict': policy.state_dict(),
+                 'train_init_kwargs': train_init_kwargs},
                ckpt_path
             )
             min_eval_loss = eval_loss
 
-        train_init_kwargs = {
-            'start_ep': i_episode,
-            'i_steps': i_steps
-        } 
         ckpt_path = (ckpt_dir / 'ckpt_latest.pth').as_posix()
         th.save({'policy_state_dict': policy.state_dict(),
                  'train_init_kwargs': train_init_kwargs},
@@ -181,7 +182,7 @@ if __name__ == '__main__':
     gail_train_loader = th.utils.data.DataLoader(
         ExpertDataset(
             'gail_experts',
-            n_routes=8,
+            n_routes=3,
             n_eps=1,
         ),
         batch_size=batch_size,
@@ -193,7 +194,7 @@ if __name__ == '__main__':
             'gail_experts',
             n_routes=2,
             n_eps=1,
-            route_start=8
+            route_start=0
         ),
         batch_size=batch_size,
         shuffle=True,

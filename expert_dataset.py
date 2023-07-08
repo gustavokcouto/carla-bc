@@ -7,6 +7,7 @@ import time
 import torch as th
 import numpy as np
 import pandas as pd
+import cv2
 
 from PIL import Image
 
@@ -60,6 +61,7 @@ class ExpertDataset(th.utils.data.Dataset):
             left_rgb = self.process_image(ep_dir / 'left_rgb/{:0>4d}.png'.format(step_idx))
             right_rgb = self.process_image(ep_dir / 'right_rgb/{:0>4d}.png'.format(step_idx))
 
+           
             obs_dict = {
                 'birdview': birdview,
                 'central_rgb': central_rgb,

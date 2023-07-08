@@ -101,9 +101,9 @@ class AgentPolicy(nn.Module):
         state = obs_dict['state']
 
         birdview = obs_dict['birdview'].float() / 255.0
-        features = self.features_extractor(birdview, state)
+        features, net_state1, net_state2 = self.features_extractor(birdview, state)
 
-        return features
+        return features, net_state1, net_state2
 
     def _get_action_dist_from_features(self, features: th.Tensor):
         latent_pi = self.policy_head(features)
@@ -115,7 +115,7 @@ class AgentPolicy(nn.Module):
         return self.action_dist.proba_distribution(mu, sigma), mu.detach().cpu().numpy(), sigma.detach().cpu().numpy()
 
     def evaluate_actions(self, obs_dict: Dict[str, th.Tensor], actions: th.Tensor):
-        features = self._get_features(obs_dict)
+        features, _, _ = self._get_features(obs_dict)
 
         distribution, _, _ = self._get_action_dist_from_features(features)
         actions = self.scale_action(actions)
@@ -128,7 +128,7 @@ class AgentPolicy(nn.Module):
         '''
         with th.no_grad():
             obs_tensor_dict = dict([(k, th.as_tensor(v).to(self.device)) for k, v in obs_dict.items()])
-            features = self._get_features(obs_tensor_dict)
+            features, net_state1, net_state2 = self._get_features(obs_tensor_dict)
             distribution, mu, sigma = self._get_action_dist_from_features(features)
             actions = distribution.get_actions(deterministic=deterministic)
             log_prob = distribution.log_prob(actions)
@@ -139,7 +139,7 @@ class AgentPolicy(nn.Module):
             actions = np.clip(actions, self.action_space.low, self.action_space.high)
         log_prob = log_prob.cpu().numpy()
         features = features.cpu().numpy()
-        return actions, log_prob, mu, sigma, features
+        return actions, log_prob, mu, sigma, features, net_state1, net_state2
 
     def scale_action(self, action: th.Tensor, eps=1e-7) -> th.Tensor:
         # input action \in [a_low, a_high]

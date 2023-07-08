@@ -24,10 +24,14 @@ class XtMaCNN(nn.Module):
             nn.ReLU(),
             nn.Conv2d(8, 16, kernel_size=5, stride=2),
             nn.ReLU(),
+        )
+        self.cnn1 = nn.Sequential(
             nn.Conv2d(16, 32, kernel_size=5, stride=2),
             nn.ReLU(),
             nn.Conv2d(32, 64, kernel_size=3, stride=2),
             nn.ReLU(),
+        )
+        self.cnn2 = nn.Sequential(
             nn.Conv2d(64, 128, kernel_size=3, stride=2),
             nn.ReLU(),
             nn.Conv2d(128, 256, kernel_size=3, stride=1),
@@ -36,7 +40,9 @@ class XtMaCNN(nn.Module):
         )
         # Compute shape by doing one forward pass
         with th.no_grad():
-            n_flatten = self.cnn(th.as_tensor(observation_space['birdview'].sample()[None]).float()).shape[1]
+            x = self.cnn(th.as_tensor(observation_space['birdview'].sample()[None]).float())
+            x = self.cnn1(x)
+            n_flatten = self.cnn2(x).shape[1]
 
         self.linear = nn.Sequential(nn.Linear(n_flatten+states_neurons[-1], 512), nn.ReLU(),
                                     nn.Linear(512, features_dim), nn.ReLU())
@@ -57,9 +63,12 @@ class XtMaCNN(nn.Module):
             nn.init.constant_(m.bias, 0.1)
 
     def forward(self, birdview, state):
-        x = self.cnn(birdview)
+        x1 = self.cnn(birdview)
+        x2 = self.cnn1(x1)
+        x = self.cnn2(x2)
         latent_state = self.state_linear(state)
 
         x = th.cat((x, latent_state), dim=1)
         x = self.linear(x)
-        return x
+        return x, x1, x2
+

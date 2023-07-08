@@ -38,6 +38,13 @@ class RlBirdviewWrapper(gym.Wrapper):
         observation_space['birdview'] = env.observation_space[self._ev_id]['birdview']['masks']
         observation_space['state'] = gym.spaces.Box(low=-10.0, high=30.0, shape=(6,), dtype=np.float32)
 
+        rgb_height, rgb_width, _  = env.observation_space[self._ev_id]['central_rgb']['data'].shape
+        rgb_channels = 3
+        rgb_space = gym.spaces.Box(low=0, high=255, shape=(rgb_channels, rgb_height, rgb_width), dtype=np.uint8)
+        observation_space['central_rgb'] = rgb_space
+        observation_space['left_rgb'] = rgb_space
+        observation_space['right_rgb'] = rgb_space
+
         env.observation_space = gym.spaces.Dict(**observation_space)
 
         env.action_space = gym.spaces.Box(low=np.array([0, -1]), high=np.array([1, 1]), dtype=np.float32)

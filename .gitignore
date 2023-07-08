@@ -1,6 +1,7 @@
 .venv
 video
 gail_experts
+gail_experts2
 ckpt
 outputs
 wandb
