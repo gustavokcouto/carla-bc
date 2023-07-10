@@ -49,7 +49,9 @@ def evaluate_policy(env, policy):
 
         net_state1_channels = []
         for i in range(16):
-            net_state1_channels.append(net_state1[0, i, :, :].cpu().numpy() *255)
+            image = net_state1[0, i:i+1, :, :].cpu().numpy() *255
+            image = np.transpose(image, [1, 2, 0]).astype(np.uint8)
+            net_state1_channels.append(image)
 
         image_width = net_state1_channels[i].shape[0]
         image_height = net_state1_channels[i].shape[1]
@@ -58,12 +60,14 @@ def evaluate_policy(env, policy):
         for i in range(16):
             i_column = int(i / 4)
             i_row = int(i % 4)
-            image_render[i_column*image_width:(i_column+1)*image_width,i_row*image_height:(i_row+1)*image_height, 0] = net_state1_channels[i]
+            image_render[i_column*image_width:(i_column+1)*image_width,i_row*image_height:(i_row+1)*image_height, :] = net_state1_channels[i]
         image_render1 = cv2.resize(image_render,(480, 480))
 
         net_state2_channels = []
         for i in range(64):
-            net_state2_channels.append(net_state2[0, i, :, :].cpu().numpy() *255)
+            image = net_state2[0, i:i+1, :, :].cpu().numpy() *255
+            image = np.transpose(image, [1, 2, 0]).astype(np.uint8)
+            net_state2_channels.append(image)
 
         image_width = net_state2_channels[i].shape[0]
         image_height = net_state2_channels[i].shape[1]
@@ -72,7 +76,7 @@ def evaluate_policy(env, policy):
         for i in range(64):
             i_column = int(i / 8)
             i_row = int(i % 8)
-            image_render[i_column*image_width:(i_column+1)*image_width,i_row*image_height:(i_row+1)*image_height, 0] = net_state2_channels[i]
+            image_render[i_column*image_width:(i_column+1)*image_width,i_row*image_height:(i_row+1)*image_height, :] = net_state2_channels[i]
         image_render2 = cv2.resize(image_render,(480, 480))
         
         cv2.imshow('rgb', cv2.cvtColor(np.hstack((left_rgb, central_rgb, right_rgb)), cv2.COLOR_BGR2RGB))
