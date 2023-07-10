@@ -139,19 +139,6 @@ if __name__ == '__main__':
                 right_rgb = np.transpose(right_rgb, [1, 2, 0]).astype(np.uint8)
                 Image.fromarray(right_rgb).save(episode_dir / 'right_rgb' / '{:0>4d}.png'.format(i_step))
                 
-                left_rgb = cv2.resize(left_rgb,(512, 288))
-                right_rgb = cv2.resize(right_rgb,(512, 288))
-                central_rgb = cv2.resize(central_rgb,(512, 288))
-                birdview_mask = cv2.resize(birdview_mask,(384,384))
-
-                cv2.imshow('rgb', cv2.cvtColor(np.hstack((left_rgb, central_rgb, right_rgb)), cv2.COLOR_BGR2RGB))
-                cv2.imshow('birdview', cv2.cvtColor(birdview_mask, cv2.COLOR_BGR2RGB))
-                cv2.waitKey(1)
-
-
-
-                #print(right_rgb.shape)
-
                 ep_dict['state'].append(obs['state'])
 
                 obs, reward, done, info = env.step(action)

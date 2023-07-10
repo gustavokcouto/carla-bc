@@ -2,15 +2,6 @@ import numpy as np
 import time
 from gym.wrappers.monitoring.video_recorder import ImageEncoder
 
-from agent_policy import AgentPolicy
-from stable_baselines3.common.vec_env import SubprocVecEnv
-import gym
-from carla_gym.envs import EndlessEnv
-from rl_birdview_wrapper import RlBirdviewWrapper
-from data_collect import reward_configs, terminal_configs, obs_configs
-import torch as th
-from pathlib import Path
-
 
 def evaluate_policy(env, policy, video_path, min_eval_steps=3000):
     policy = policy.eval()
@@ -110,4 +101,3 @@ def get_avg_route_completion(ep_route_completion, prefix=''):
     avg_ep_stat[f'{prefix}avg_n_episodes'] = n_episodes
 
     return avg_ep_stat
-

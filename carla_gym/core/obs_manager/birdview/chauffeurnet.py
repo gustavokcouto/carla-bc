@@ -141,10 +141,10 @@ class ObsManager(ObsManagerBase):
             = self._get_history_masks(M_warp)
 
         # road_mask, lane_mask
-        road_mask = cv.warpAffine(self._road, M_warp, (self._width, self._width)).astype(np.bool)
-        lane_mask_all = cv.warpAffine(self._lane_marking_all, M_warp, (self._width, self._width)).astype(np.bool)
+        road_mask = cv.warpAffine(self._road, M_warp, (self._width, self._width)).astype(bool)
+        lane_mask_all = cv.warpAffine(self._lane_marking_all, M_warp, (self._width, self._width)).astype(bool)
         lane_mask_broken = cv.warpAffine(self._lane_marking_white_broken, M_warp,
-                                         (self._width, self._width)).astype(np.bool)
+                                         (self._width, self._width)).astype(bool)
 
         # route_mask
         route_mask = np.zeros([self._width, self._width], dtype=np.uint8)
@@ -152,7 +152,7 @@ class ObsManager(ObsManagerBase):
                                    for wp, _ in self._parent_actor.route_plan[0:80]])
         route_warped = cv.transform(route_in_pixel, M_warp)
         cv.polylines(route_mask, [np.round(route_warped).astype(np.int32)], False, 1, thickness=16)
-        route_mask = route_mask.astype(np.bool)
+        route_mask = route_mask.astype(bool)
 
         # ev_mask
         ev_mask = self._get_mask_from_actor_list([(ev_transform, ev_bbox.location, ev_bbox.extent)], M_warp)
@@ -237,7 +237,7 @@ class ObsManager(ObsManagerBase):
             point_1 = int(stopline_warped[0, 0, 0]), int(stopline_warped[0, 0, 1])
             point_2 = int(stopline_warped[1, 0, 0]), int(stopline_warped[1, 0, 1])
             cv.line(mask, point_1, point_2, color=1, thickness=6)
-        return mask.astype(np.bool)
+        return mask.astype(bool)
 
     def _get_mask_from_actor_list(self, actor_list, M_warp):
         mask = np.zeros([self._width, self._width], dtype=np.uint8)
@@ -255,7 +255,7 @@ class ObsManager(ObsManagerBase):
             corners_warped = cv.transform(corners_in_pixel, M_warp)
 
             cv.fillConvexPoly(mask, np.round(corners_warped).astype(np.int32), 1)
-        return mask.astype(np.bool)
+        return mask.astype(bool)
 
     @staticmethod
     def _get_surrounding_actors(bbox_list, criterium, scale=None):
