@@ -2,6 +2,7 @@ import carla
 import numpy as np
 import pandas as pd
 import tqdm
+import json
 
 from PIL import Image
 from pathlib import Path
@@ -87,8 +88,9 @@ obs_configs = {
 }
 
 if __name__ == '__main__':
+    cfg = json.load(open("config.json", "r"))
     env = LeaderboardEnv(obs_configs=obs_configs, reward_configs=reward_configs,
-                         terminal_configs=terminal_configs, host="localhost", port=2000,
+                         terminal_configs=terminal_configs, host="localhost", port=cfg['port'],
                          seed=2021, no_rendering=False, **env_configs)
     env = RlBirdviewWrapper(env)
     expert_file_dir = Path('gail_experts')
@@ -96,7 +98,8 @@ if __name__ == '__main__':
     # obs_metrics = ['control', 'vel_xy', 'linear_speed', 'vec', 'traj', 'cmd', 'command', 'state']
     for route_id in tqdm.tqdm(range(10)):
         env.set_task_idx(route_id)
-        for ep_id in range(1):
+        n_episodes = 1  # change to more if there is noisy actions
+        for ep_id in range(n_episodes):
             episode_dir = expert_file_dir / ('route_%02d' % route_id) / ('ep_%02d' % ep_id)
             (episode_dir / 'birdview_masks').mkdir(parents=True)
             (episode_dir / 'central_rgb').mkdir(parents=True)

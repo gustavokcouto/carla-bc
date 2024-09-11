@@ -5,6 +5,7 @@ import torch as th
 from pathlib import Path
 import wandb
 import gym
+import json
 
 from expert_dataset import ExpertDataset
 from agent_policy import AgentPolicy
@@ -143,8 +144,9 @@ def learn_bc(policy, device, expert_loader, eval_loader, env, resume_last_train)
 
 
 def env_maker():
+    cfg = json.load(open("config.json", "r"))
     env = EndlessEnv(obs_configs=obs_configs, reward_configs=reward_configs,
-                    terminal_configs=terminal_configs, host='localhost', port=2000,
+                    terminal_configs=terminal_configs, host='localhost', port=cfg['port'],
                     seed=2021, no_rendering=True, **env_configs)
     env = RlBirdviewWrapper(env)
     return env
