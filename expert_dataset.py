@@ -21,7 +21,7 @@ class ExpertDataset(th.utils.data.Dataset):
 
         for route_idx in range(route_start, route_start + n_routes):
             for ep_idx in range(ep_start, ep_start + n_eps):
-                route_path = self.dataset_path / ('route_%02d' % route_idx) / ('ep_%02d' % ep_idx)
+                route_path = self.dataset_path / 'route_{}'.format(route_idx) / 'ep_{}'.format(ep_idx)
                 route_df = pd.read_json(route_path / 'episode.json')
                 traj_length = route_df.shape[0]
                 self.length += traj_length
@@ -49,16 +49,16 @@ class ExpertDataset(th.utils.data.Dataset):
         route_idx, ep_idx, step_idx = self.get_idx[j]
         if self.actual_obs[j] is None:
             # Load only the first time, images in uint8 are supposed to be light
-            ep_dir = self.dataset_path / 'route_{:0>2d}/ep_{:0>2d}'.format(route_idx, ep_idx)
+            ep_dir = self.dataset_path / 'route_{}/ep_{}'.format(route_idx, ep_idx)
             masks_list = []
-            for mask_index in range(1):
-                mask_tensor = self.process_image(ep_dir / 'birdview_masks/{:0>4d}_{:0>2d}.png'.format(step_idx, mask_index))
+            for mask_index in range(4):
+                mask_tensor = self.process_image(ep_dir / 'birdview_masks/{}_{}.png'.format(step_idx, mask_index))
                 masks_list.append(mask_tensor)
             birdview = th.cat(masks_list)
 
-            central_rgb = self.process_image(ep_dir / 'central_rgb/{:0>4d}.png'.format(step_idx))
-            left_rgb = self.process_image(ep_dir / 'left_rgb/{:0>4d}.png'.format(step_idx))
-            right_rgb = self.process_image(ep_dir / 'right_rgb/{:0>4d}.png'.format(step_idx))
+            central_rgb = self.process_image(ep_dir / 'central_rgb/{}.png'.format(step_idx))
+            left_rgb = self.process_image(ep_dir / 'left_rgb/{}.png'.format(step_idx))
+            right_rgb = self.process_image(ep_dir / 'right_rgb/{}.png'.format(step_idx))
 
             obs_dict = {
                 'birdview': birdview,
@@ -70,7 +70,7 @@ class ExpertDataset(th.utils.data.Dataset):
 
             state_dict = self.trajs_states[j]
             for state_key in state_dict:
-                obs_dict[state_key] = th.Tensor(state_dict[state_key])
+                obs_dict[state_key] = th.tensor(np.array(state_dict[state_key]), dtype=th.float32)
             self.actual_obs[j] = obs_dict
         else:
             obs_dict = self.actual_obs[j]

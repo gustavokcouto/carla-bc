@@ -34,7 +34,7 @@ def learn_bc(policy, device, expert_loader, eval_loader, resume_last_train):
         i_steps = train_kwargs['i_steps']
 
         policy.load_state_dict(saved_variables['policy_state_dict'])
-        wandb.init(project='gail-carla2', id=wandb_run_id, resume='must')
+        run = wandb.init(project='gail-carla2', id=wandb_run_id, resume='must')
     else:
         run = wandb.init(project='gail-carla2', reinit=True)
         with open(last_checkpoint_path, 'w') as log_file:
@@ -70,7 +70,7 @@ def learn_bc(policy, device, expert_loader, eval_loader, resume_last_train):
             bcloss = -alogprobs.mean()
 
             loss = bcloss + ent_weight * entropy_loss
-            total_loss += loss
+            total_loss += loss.item()
             i_batch += 1
             i_steps += expert_obs_dict['state'].shape[0]
 
@@ -94,7 +94,7 @@ def learn_bc(policy, device, expert_loader, eval_loader, resume_last_train):
             bcloss = -alogprobs.mean()
 
             eval_loss = bcloss + ent_weight * entropy_loss
-            total_eval_loss += eval_loss
+            total_eval_loss += eval_loss.item()
             i_eval_batch += 1
         
         loss = total_loss / i_batch
@@ -128,11 +128,11 @@ if __name__ == '__main__':
     resume_last_train = False
 
     observation_space = {}
-    observation_space['birdview'] = gym.spaces.Box(low=0, high=255, shape=(3, 192, 192), dtype=np.uint8)
+    observation_space['birdview'] = gym.spaces.Box(low=0, high=255, shape=(12, 192, 192), dtype=np.uint8)
     observation_space['state'] = gym.spaces.Box(low=-10.0, high=30.0, shape=(6,), dtype=np.float32)
     observation_space = gym.spaces.Dict(**observation_space)
 
-    action_space = gym.spaces.Box(low=np.array([0, -1]), high=np.array([1, 1]), dtype=np.float32)
+    action_space = gym.spaces.Box(low=np.array([-1, -1]), high=np.array([1, 1]), dtype=np.float32)
 
     # network
     policy_kwargs = {
@@ -153,7 +153,7 @@ if __name__ == '__main__':
 
     gail_train_loader = th.utils.data.DataLoader(
         ExpertDataset(
-            'gail_experts',
+            'experts_traffic_light_noisy',
             n_routes=8,
             n_eps=1,
         ),
@@ -163,7 +163,7 @@ if __name__ == '__main__':
     
     gail_val_loader = th.utils.data.DataLoader(
         ExpertDataset(
-            'gail_experts',
+            'experts_traffic_light_noisy',
             n_routes=2,
             n_eps=1,
             route_start=8

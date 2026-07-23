@@ -11,7 +11,7 @@ from expert_dataset import ExpertDataset
 from agent_policy import AgentPolicy
 from carla_gym.envs import EndlessEnv
 from rl_birdview_wrapper import RlBirdviewWrapper
-from data_collect import reward_configs, terminal_configs, obs_configs
+from configs.data_collection_config import reward_configs, terminal_configs_eval, obs_configs
 from eval_agent import evaluate_policy
 from stable_baselines3.common.vec_env import SubprocVecEnv
 
@@ -37,13 +37,21 @@ def eval_bc(policy, device, env):
 
     eval_video_path = (video_path / f'bc_eval.mp4').as_posix()
     avg_ep_stat, avg_route_completion, ep_events = evaluate_policy(env, policy, eval_video_path)
+
+    print('--- avg_ep_stat ---')
+    for k, v in avg_ep_stat.items():
+        print(f'{k}: {v}')
+    print('--- avg_route_completion ---')
+    for k, v in avg_route_completion.items():
+        print(f'{k}: {v}')
+
     env.reset()
 
 
 def env_maker():
     cfg = json.load(open("config.json", "r"))
     env = EndlessEnv(obs_configs=obs_configs, reward_configs=reward_configs,
-                    terminal_configs=terminal_configs, host='localhost', port=cfg['port'],
+                    terminal_configs=terminal_configs_eval, host='localhost', port=cfg['port'],
                     seed=2021, no_rendering=True, **env_configs)
     env = RlBirdviewWrapper(env)
     return env
@@ -52,11 +60,11 @@ if __name__ == '__main__':
     env = SubprocVecEnv([env_maker])
 
     observation_space = {}
-    observation_space['birdview'] = gym.spaces.Box(low=0, high=255, shape=(3, 192, 192), dtype=np.uint8)
+    observation_space['birdview'] = gym.spaces.Box(low=0, high=255, shape=(12, 192, 192), dtype=np.uint8)
     observation_space['state'] = gym.spaces.Box(low=-10.0, high=30.0, shape=(6,), dtype=np.float32)
     observation_space = gym.spaces.Dict(**observation_space)
 
-    action_space = gym.spaces.Box(low=np.array([0, -1]), high=np.array([1, 1]), dtype=np.float32)
+    action_space = gym.spaces.Box(low=np.array([-1, -1]), high=np.array([1, 1]), dtype=np.float32)
 
     # network
     policy_kwargs = {

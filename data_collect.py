@@ -1,153 +1,162 @@
+# Import CARLA from the egg
+import sys
+import glob
 import carla
+
 import numpy as np
 import pandas as pd
 import tqdm
-import json
+import os
 
 from PIL import Image
 from pathlib import Path
 
 from carla_gym.envs import LeaderboardEnv
-from carla_gym.core.task_actor.scenario_actor.agents.constant_speed_agent import ConstantSpeedAgent
+from carla_gym.utils.hazard_actor import lbc_hazard_vehicle, lbc_hazard_walker
+from expert.lbc_roaming_agent import LbcRoamingAgent
+
+from configs.data_collection_config import reward_configs, terminal_configs, env_configs, obs_configs
 from carla_gym.utils.expert_noiser import ExpertNoiser
-from rl_birdview_wrapper import RlBirdviewWrapper
 
 
-reward_configs = {
-    'hero': {
-        'entry_point': 'reward.valeo_action:ValeoAction',
-        'kwargs': {}
+def create_folders(base: str, route_id: int, ep_id: int) -> str:
+    episode_dir = base / 'route_{}'.format(route_id) / ('ep_{}'.format(ep_id))
+    for name in ['birdview_rendered', 'birdview_masks', 'central_rgb', 'left_rgb','right_rgb' ]:
+        path = episode_dir / name
+        if not os.path.exists(path):
+            (episode_dir / name).mkdir(parents=True)
+            
+    return episode_dir
+  
+
+def store_camera_img(obs, camera_name: str, episode_dir: str, ep_step: int):
+    camera = obs[camera_name]['data']
+    camera = camera.astype(np.uint8)
+    Image.fromarray(camera).save(episode_dir / '{}'.format(camera_name) / '{}.png'.format(ep_step))
+
+
+def collect_data(dir_name, with_breaking=False, noise_lon=False, noise_lat=False):
+    ''' Creates expert dataset. Stores all 15 channels!
+    '''
+    noise_kwargs = {
+        'noise_lon': noise_lon, 
+        'lan_intensity': 10,
+        'noise_lat': noise_lat,
+        'lat_intensity': 4
     }
-}
-
-terminal_configs = {
-    'hero': {
-        'entry_point': 'terminal.valeo_no_det_px:ValeoNoDetPx',
-        'kwargs': {}
-    }
-}
-
-env_configs = {
-    'carla_map': 'Town01',
-    'weather_group': 'dynamic_1.0',
-    'routes_group': 'train'
-}
-
-obs_configs = {
-    'hero': {
-        'speed': {
-            'module': 'actor_state.speed'
-        },
-        'control': {
-            'module': 'actor_state.control'
-        },
-        'velocity': {
-            'module': 'actor_state.velocity'
-        },
-        'birdview': {
-            'module': 'birdview.chauffeurnet',
-            'width_in_pixels': 192,
-            'pixels_ev_to_bottom': 40,
-            'pixels_per_meter': 5.0,
-            'history_idx': [-16, -11, -6, -1],
-            'scale_bbox': True,
-            'scale_mask_col': 1.0
-        },
-        'route_plan': {
-            'module': 'navigation.waypoint_plan',
-            'steps': 20
-        },
-        'gnss': {
-            'module': 'navigation.gnss'
-        },    
-        'central_rgb': {
-            'module': 'camera.rgb',
-            'fov': 90,
-            'width': 256,
-            'height': 144,
-            'location': [1.2, 0.0, 1.3],
-            'rotation': [0.0, 0.0, 0.0]
-        },
-        'left_rgb': {
-            'module': 'camera.rgb',
-            'fov': 90,
-            'width': 256,
-            'height': 144,
-            'location': [1.2, -0.25, 1.3],
-            'rotation': [0.0, 0.0, -45.0]
-        },
-        'right_rgb': {
-            'module': 'camera.rgb',
-            'fov': 90,
-            'width': 256,
-            'height': 144,
-            'location': [1.2, 0.25, 1.3],
-            'rotation': [0.0, 0.0, 45.0]
-        }
-    }
-}
-
-if __name__ == '__main__':
-    cfg = json.load(open("config.json", "r"))
+    # collect data from predefined routes of leaderboard
     env = LeaderboardEnv(obs_configs=obs_configs, reward_configs=reward_configs,
-                         terminal_configs=terminal_configs, host="localhost", port=cfg['port'],
+                         terminal_configs=terminal_configs, host="localhost", port=2002,
                          seed=2021, no_rendering=False, **env_configs)
-    env = RlBirdviewWrapper(env)
-    expert_file_dir = Path('gail_experts')
+    # env = RlBirdviewWrapper(env, with_breaking=with_breaking, **noise_kwargs)
+    longitudinal_noiser = ExpertNoiser('Throttle', frequency=15, intensity=noise_kwargs['lan_intensity'], min_noise_time_amount=2.0)
+    lateral_noiser = ExpertNoiser('Spike', frequency=25, intensity=noise_kwargs['lat_intensity'], min_noise_time_amount=0.5)
+    expert_file_dir = Path(dir_name)
     expert_file_dir.mkdir(parents=True, exist_ok=True)
-    # obs_metrics = ['control', 'vel_xy', 'linear_speed', 'vec', 'traj', 'cmd', 'command', 'state']
-    for route_id in tqdm.tqdm(range(10)):
+    
+    for route_id in tqdm.tqdm(range(8, 10)):
         env.set_task_idx(route_id)
-        n_episodes = 1  # change to more if there is noisy actions
-        for ep_id in range(n_episodes):
-            episode_dir = expert_file_dir / ('route_%02d' % route_id) / ('ep_%02d' % ep_id)
-            (episode_dir / 'birdview_masks').mkdir(parents=True)
-            (episode_dir / 'central_rgb').mkdir(parents=True)
-            (episode_dir / 'left_rgb').mkdir(parents=True)
-            (episode_dir / 'right_rgb').mkdir(parents=True)
+        ibc_roaming_agent = LbcRoamingAgent()
+        for ep_id in range(2):
+            episode_dir = create_folders(expert_file_dir, route_id, ep_id)
 
-            longitudinal_noiser = ExpertNoiser('Throttle', frequency=15, intensity=10, min_noise_time_amount=2.0)
-            lateral_noiser = ExpertNoiser('Spike', frequency=25, intensity=4, min_noise_time_amount=0.5)
-
+            ibc_roaming_agent.reset()
             obs = env.reset()
-            basic_agent = ConstantSpeedAgent(env.env._ev_handler.ego_vehicles['hero'], None, 6.0)
+            timestamp = env.timestamp
+            
             ep_dict = {}
             ep_dict['done'] = []
             ep_dict['actions'] = []
+            ep_dict['cmd'] = []
             ep_dict['state'] = []
-            actions_ep = []
+            ep_dict['vehicle_hazard'] = []
+            ep_dict['pedestrian_ahead'] = []
+            ep_dict['redlight_ahead'] = []
+
             i_step = 0
-            c_route = False
-            while not c_route:
-                state_list = []
-                ep_dict['done'].append(c_route)
-                action = basic_agent.get_action()
-                ep_dict['actions'].append([action[0], action[1]])
-                birdview = obs['birdview']
-                for i_mask in range(1):
+            route_completed = False
+            episode_done = False
+
+            while not (route_completed or episode_done):
+
+                ep_dict['done'].append(route_completed)
+                obs = obs['hero']
+                action = ibc_roaming_agent.run_step(obs, timestamp)
+                if action.throttle > 0:
+                    acc = action.throttle
+                else:
+                    acc = -action.brake
+                steer = action.steer
+                ep_dict['actions'].append([acc, steer]) # acc and steering only brake is infered from acc
+                birdview = obs['birdview']['masks']
+                
+                # if I would want to store all 15 channels
+                #for i_mask in range(5):
+                for i_mask in range(4): #its storing 5 images now, if only 1 then range(1) # only for images if history only 3
                     birdview_mask = birdview[i_mask * 3: i_mask * 3 + 3]
                     birdview_mask = np.transpose(birdview_mask, [1, 2, 0]).astype(np.uint8)
-                    Image.fromarray(birdview_mask).save(episode_dir / 'birdview_masks' / '{:0>4d}_{:0>2d}.png'.format(i_step, i_mask))
+                    Image.fromarray(birdview_mask).save(episode_dir / 'birdview_masks' / '{}_{}.png'.format(i_step, i_mask))
+                
+                birdview = obs['birdview']['rendered']
+                Image.fromarray(birdview).save(episode_dir / 'birdview_rendered' / '{}.png'.format(i_step))
 
-                central_rgb = obs['central_rgb']
-                central_rgb = np.transpose(central_rgb, [1, 2, 0]).astype(np.uint8)
-                Image.fromarray(central_rgb).save(episode_dir / 'central_rgb' / '{:0>4d}.png'.format(i_step))
+                
+                camaras = ['central_rgb', 'left_rgb', 'right_rgb']
+                for camera_name in camaras:
+                    store_camera_img(obs, camera_name, episode_dir, i_step)
 
-                left_rgb = obs['left_rgb']
-                left_rgb = np.transpose(left_rgb, [1, 2, 0]).astype(np.uint8)
-                Image.fromarray(left_rgb).save(episode_dir / 'left_rgb' / '{:0>4d}.png'.format(i_step))
 
-                right_rgb = obs['right_rgb']
-                right_rgb = np.transpose(right_rgb, [1, 2, 0]).astype(np.uint8)
-                Image.fromarray(right_rgb).save(episode_dir / 'right_rgb' / '{:0>4d}.png'.format(i_step))
+                hazard_vehicle_loc = lbc_hazard_vehicle(obs['surrounding_vehicles'], obs['speed']['speed_xy'][0])
+                vehicle_hazard = hazard_vehicle_loc is not None
+                ep_dict['vehicle_hazard'].append(vehicle_hazard)
+                hazard_ped_loc = lbc_hazard_walker(obs['surrounding_pedestrians'])
+                pedestrian_ahead = hazard_ped_loc is not None
+                ep_dict['pedestrian_ahead'].append(pedestrian_ahead)
+                redlight_ahead = obs['traffic_light']['at_red_light'] == 1
+                ep_dict['redlight_ahead'].append(redlight_ahead)
 
-                ep_dict['state'].append(obs['state'])
+                state_list = []
+                state_list.append(obs['control']['throttle'])
+                state_list.append(obs['control']['steer'])
+                state_list.append(obs['control']['brake'])
+                state_list.append(obs['control']['gear']/5.0)
+                state_list.append(obs['velocity']['vel_xy'])
+                state = np.concatenate(state_list)
+                ep_dict['state'].append(state)
+                # VOID = -1
+                # LEFT = 1
+                # RIGHT = 2
+                # STRAIGHT = 3
+                # LANEFOLLOW = 4
+                # CHANGELANELEFT = 5
+                # CHANGELANERIGHT = 6
+                command = obs['gnss']['command'][0]
+                if command < 0:
+                    command = 4
+                command -= 1
+                cmd_one_hot = [0] * 6
+                cmd_one_hot[command] = 1
+                cmd_array = np.array(cmd_one_hot)
+                ep_dict['cmd'].append(cmd_array)
 
+                if noise_kwargs['noise_lon']:
+                    action, _, _ = longitudinal_noiser.compute_noise(action, obs['speed']['forward_speed'][0] * 3.6)
+                if noise_kwargs['noise_lat']:
+                    action, _, _ = lateral_noiser.compute_noise(action, obs['speed']['forward_speed'][0] * 3.6)
+                action = {'hero': action}
                 obs, reward, done, info = env.step(action)
-                c_route = info['route_completion']['is_route_completed']
+                route_completed = info['hero']['route_completion']['is_route_completed']
+                episode_done = done['hero']
 
                 i_step += 1
-
-
+                timestamp = env.timestamp
+                
             ep_df = pd.DataFrame(ep_dict)
             ep_df.to_json(episode_dir / 'episode.json')
+                
+if __name__ == '__main__':
+    # with breaking sets the actions space of acc to -1,1
+    # instead of just 0,1. If we want our agent to break this
+    # needs to be included
+    dir_name = 'experts_traffic_light_noisy'
+    collect_data(dir_name=dir_name, with_breaking=True, noise_lon=True, noise_lat=True)

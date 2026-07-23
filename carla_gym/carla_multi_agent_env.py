@@ -32,10 +32,10 @@ class CarlaMultiAgentEnv(gym.Env):
         # define observation spaces exposed to agent
         self._om_handler = ObsManagerHandler(obs_configs)
         self._ev_handler = EgoVehicleHandler(self._client, reward_configs, terminal_configs)
-        # self._zw_handler = ZombieWalkerHandler(self._client)
-        # self._zv_handler = ZombieVehicleHandler(self._client, tm_port=self._tm.get_port())
+        self._zw_handler = ZombieWalkerHandler(self._client)
+        self._zv_handler = ZombieVehicleHandler(self._client, tm_port=self._tm.get_port())
         self._sa_handler = ScenarioActorHandler(self._client)
-        # self._wt_handler = WeatherHandler(self._world)
+        self._wt_handler = WeatherHandler(self._world)
 
         # observation spaces
         self.observation_space = self._om_handler.observation_space
@@ -70,8 +70,8 @@ class CarlaMultiAgentEnv(gym.Env):
             self._task = self._all_tasks[self._task_idx].copy()
         self.clean()
 
-        # self._wt_handler.reset(self._task['weather'])
-        # logger.debug("_wt_handler reset done!!")
+        self._wt_handler.reset(self._task['weather'])
+        logger.debug("_wt_handler reset done!!")
 
         ev_spawn_locations = self._ev_handler.reset(self._task['ego_vehicles'])
         logger.debug("_ev_handler reset done!!")
@@ -79,11 +79,11 @@ class CarlaMultiAgentEnv(gym.Env):
         self._sa_handler.reset(self._task['scenario_actors'], self._ev_handler.ego_vehicles)
         logger.debug("_sa_handler reset done!!")
 
-        # self._zw_handler.reset(self._task['num_zombie_walkers'], ev_spawn_locations)
-        # logger.debug("_zw_handler reset done!!")
+        self._zw_handler.reset(self._task['num_zombie_walkers'], ev_spawn_locations)
+        logger.debug("_zw_handler reset done!!")
 
-        # self._zv_handler.reset(self._task['num_zombie_vehicles'], ev_spawn_locations)
-        # logger.debug("_zv_handler reset done!!")
+        self._zv_handler.reset(self._task['num_zombie_vehicles'], ev_spawn_locations)
+        logger.debug("_zv_handler reset done!!")
 
         self._om_handler.reset(self._ev_handler.ego_vehicles)
         logger.debug("_om_handler reset done!!")
@@ -107,18 +107,10 @@ class CarlaMultiAgentEnv(gym.Env):
         # get obeservations
         obs_dict = self._om_handler.get_observation(self.timestamp)
         return obs_dict
-    
-    def tick_scenario(self):
-        spectator = self._world.get_spectator()
-        spectator.set_transform(
-            carla.Transform(
-                self._ev_handler.ego_vehicles['hero'].vehicle.get_location() + carla.Location(z=50),
-                carla.Rotation(pitch=-90)))
-            
+
     def step(self, control_dict):
         self._ev_handler.apply_control(control_dict)
         self._sa_handler.tick()
-        self.tick_scenario()
         # tick world
         self._world.tick()
 
@@ -138,7 +130,7 @@ class CarlaMultiAgentEnv(gym.Env):
         obs_dict = self._om_handler.get_observation(self.timestamp)
 
         # update weather
-        # self._wt_handler.tick(snap_shot.timestamp.delta_seconds)
+        self._wt_handler.tick(snap_shot.timestamp.delta_seconds)
 
         # num_walkers = len(self._world.get_actors().filter("*walker.pedestrian*"))
         # num_vehicles = len(self._world.get_actors().filter("vehicle*"))
@@ -208,9 +200,9 @@ class CarlaMultiAgentEnv(gym.Env):
 
     def clean(self):
         self._sa_handler.clean()
-        # self._zw_handler.clean()
-        # self._zv_handler.clean()
+        self._zw_handler.clean()
+        self._zv_handler.clean()
         self._om_handler.clean()
         self._ev_handler.clean()
-        # self._wt_handler.clean()
+        self._wt_handler.clean()
         self._world.tick()

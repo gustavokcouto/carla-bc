@@ -1,6 +1,7 @@
 .venv
 video
 gail_experts
+experts_traffic_light_noisy
 ckpt
 outputs
 wandb
