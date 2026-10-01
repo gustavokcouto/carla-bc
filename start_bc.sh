@@ -1,6 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
 
-#!/bin/bash
+PROJECT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+cd "$PROJECT_DIR"
 
-export PYTHONPATH=$PYTHONPATH:./api_carla/9.10/PythonAPI/carla/
-export PYTHONPATH=$PYTHONPATH:./api_carla/9.10/PythonAPI/carla/dist/carla-0.9.10-py3.7-linux-x86_64.egg
-screen -L -S carla_bc .venv/bin/python learn_bc.py
+PYTHON="${PYTHON:-$PROJECT_DIR/.venv/bin/python}"
+
+if [[ ! -x "$PYTHON" ]]; then
+    echo "ERROR: virtual environment not found at $PYTHON" >&2
+    exit 1
+fi
+
+"$PYTHON" -c "import carla, importlib.metadata as m; print('CARLA Python client:', m.version('carla'))"
+
+exec screen -L -S carla_bc "$PYTHON" learn_bc.py
