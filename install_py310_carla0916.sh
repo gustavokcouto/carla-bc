@@ -13,9 +13,9 @@ if [[ ! -x "$PYTHON_BIN" ]]; then
 fi
 
 echo "Using: $("$PYTHON_BIN" --version)"
-"$PYTHON_BIN" -m pip install --upgrade pip
+"$PYTHON_BIN" -m pip install "pip==24.0"
 
-# Gym 0.21 does not build with recent setuptools/wheel defaults.
+# Gym 0.21 metadata is rejected by pip >=24.1 and does not build with recent setuptools/wheel defaults.
 # Keep the legacy Gym API used by stable-baselines3 1.6.x and this codebase.
 "$PYTHON_BIN" -m pip install "setuptools==65.5.0" "wheel==0.38.4"
 "$PYTHON_BIN" -m pip install --no-build-isolation "gym==0.21.0"
