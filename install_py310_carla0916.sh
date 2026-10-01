@@ -22,6 +22,7 @@ echo "Using: $("$PYTHON_BIN" --version)"
 
 # requirements.txt intentionally does not pin torch/torchvision, so a working
 # CUDA-enabled PyTorch installation is preserved.
+"$PYTHON_BIN" -m pip uninstall -y hydra >/dev/null 2>&1 || true
 "$PYTHON_BIN" -m pip install -r requirements.txt
 
 "$PYTHON_BIN" - <<'PY'
