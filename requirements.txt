@@ -16,4 +16,4 @@ wandb==0.13.4
 opencv-python==4.6.0.66
 omegaconf==2.2.3
 shapely==2.0.6
-hydra==2.5
+hydra-core==1.2.0
