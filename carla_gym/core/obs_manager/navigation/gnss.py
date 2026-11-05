@@ -84,22 +84,47 @@ class ObsManager(ObsManagerBase):
 
     def get_observation(self):
         snap_shot = self._world.get_snapshot()
-        assert self._gnss_queue.qsize() <= 1
-        assert self._imu_queue.qsize() <= 1
+
+        # ALTERAÇÃO 1: o original tinha, aqui, dois `assert`:
+        #     assert self._gnss_queue.qsize() <= 1
+        #     assert self._imu_queue.qsize() <= 1
+        # Eles travavam o processo inteiro (AssertionError) sempre que mais
+        # de uma leitura se acumulava na fila entre dois ticks — uma condição
+        # de corrida sensível a carga de GPU/CPU e a diferenças de sincronismo
+        # entre versões do CARLA. Os dois asserts foram removidos: a fila
+        # agora pode acumular mais de um item sem derrubar o programa; quem
+        # trata isso é a ALTERAÇÃO 2 logo abaixo, que descarta o excesso e
+        # fica só com a leitura mais recente.
 
         # get gnss
-        try: 
+        # ALTERAÇÃO 2: antes, o código lia um único item da fila e exigia,
+        # com assert, que o frame batesse exatamente com o do snapshot atual
+        # (assert snap_shot.frame == frame). Agora, depois de pegar o
+        # primeiro item, drenamos o restante da fila (while ... qsize() > 0)
+        # para ficar com a leitura mais nova, e trocamos o assert de frame
+        # por um aviso impresso (em vez de travar o processo quando os frames
+        # não batem exatamente).
+        try:
             frame, gnss_data = self._gnss_queue.get(True, self._queue_timeout)
-            assert snap_shot.frame == frame
+            while self._gnss_queue.qsize() > 0:
+                frame, gnss_data = self._gnss_queue.get_nowait()
         except Empty:
             raise Exception('gnss sensor took too long!')
+        if snap_shot.frame != frame:
+            print(f'aviso: gnss do frame {frame}, esperado {snap_shot.frame} '
+                  '(dessincronia entre sensor e tick, usando leitura mais recente)')
 
         # get imu
-        try: 
+        # ALTERAÇÃO 3: mesma ideia da ALTERAÇÃO 2, agora para a fila do IMU.
+        try:
             frame, imu_data = self._imu_queue.get(True, self._queue_timeout)
-            assert snap_shot.frame == frame
+            while self._imu_queue.qsize() > 0:
+                frame, imu_data = self._imu_queue.get_nowait()
         except Empty:
             raise Exception('imu sensor took too long!')
+        if snap_shot.frame != frame:
+            print(f'aviso: imu do frame {frame}, esperado {snap_shot.frame} '
+                  '(dessincronia entre sensor e tick, usando leitura mais recente)')
 
         # target gps
         global_plan_gps = self._parent_actor.global_plan_gps

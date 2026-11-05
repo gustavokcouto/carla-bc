@@ -3,7 +3,7 @@ import time
 from gym.wrappers.monitoring.video_recorder import ImageEncoder
 
 
-def evaluate_policy(env, policy, video_path, min_eval_steps=3000):
+def evaluate_policy(env, policy, video_path, min_eval_steps=3000): #para testes min_eval_steps = 100, 
     policy = policy.eval()
     t0 = time.time()
     for i in range(env.num_envs):

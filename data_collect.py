@@ -1,7 +1,7 @@
 import carla
 import numpy as np
 import pandas as pd
-import tqdm
+import tqdm #barra de progresso 
 import json
 
 from PIL import Image
@@ -28,12 +28,12 @@ terminal_configs = {
 }
 
 env_configs = {
-    'carla_map': 'Town01',
+    'carla_map': 'Town01', #cidade utilizada
     'weather_group': 'dynamic_1.0',
     'routes_group': 'train'
 }
 
-obs_configs = {
+obs_configs = { #"sentidos" do carro: velocidade, controle, bdv, plano de rotas, GNSS e 3 câmeras
     'hero': {
         'speed': {
             'module': 'actor_state.speed'
@@ -96,9 +96,9 @@ if __name__ == '__main__':
     expert_file_dir = Path('gail_experts')
     expert_file_dir.mkdir(parents=True, exist_ok=True)
     # obs_metrics = ['control', 'vel_xy', 'linear_speed', 'vec', 'traj', 'cmd', 'command', 'state']
-    for route_id in tqdm.tqdm(range(10)):
+    for route_id in tqdm.tqdm(range(10)): #laço de repetição da execução das rotas
         env.set_task_idx(route_id)
-        n_episodes = 1  # change to more if there is noisy actions
+        n_episodes = 1  # change to more if there is noisy actions, representa quantas vezes essa mesma rota será executada
         for ep_id in range(n_episodes):
             episode_dir = expert_file_dir / ('route_%02d' % route_id) / ('ep_%02d' % ep_id)
             (episode_dir / 'birdview_masks').mkdir(parents=True)
@@ -106,23 +106,40 @@ if __name__ == '__main__':
             (episode_dir / 'left_rgb').mkdir(parents=True)
             (episode_dir / 'right_rgb').mkdir(parents=True)
 
-            longitudinal_noiser = ExpertNoiser('Throttle', frequency=15, intensity=10, min_noise_time_amount=2.0)
-            lateral_noiser = ExpertNoiser('Spike', frequency=25, intensity=4, min_noise_time_amount=0.5)
+            longitudinal_noiser = ExpertNoiser('Throttle', frequency=15, intensity=10, min_noise_time_amount=2.0) #ruído frontal: não aplicado
+            lateral_noiser = ExpertNoiser('Spike', frequency=25, intensity=4, min_noise_time_amount=0.5) #ruído lateral: não aplicado
 
-            obs = env.reset()
-            basic_agent = ConstantSpeedAgent(env.env._ev_handler.ego_vehicles['hero'], None, 6.0)
-            ep_dict = {}
+            obs = env.reset() #reposiciona o carro no início da rota e retorna a 1ª observação
+            basic_agent = ConstantSpeedAgent(env.env._ev_handler.ego_vehicles['hero'], None, 6.0) #especialista PID que vai manter 6m/s e seguir a rota
+            ep_dict = {} #Cada passo da simulação acrescenta um item
             ep_dict['done'] = []
             ep_dict['actions'] = []
             ep_dict['state'] = []
+            ep_dict['pose'] = [] #lista nova
+            ep_dict['command'] = [] #lista nova
             actions_ep = []
             i_step = 0
             c_route = False
             while not c_route:
                 state_list = []
                 ep_dict['done'].append(c_route)
-                action = basic_agent.get_action()
+                action = basic_agent.get_action() #ação dada pelo especialista
                 ep_dict['actions'].append([action[0], action[1]])
+
+                # Pose global do carro no instante atual: [x, y, yaw_em_radianos]. 
+                # Como convenção usamos radianos igual o notebook 02
+                ev_transform = env.env._ev_handler.ego_vehicles['hero'].vehicle.get_transform()
+                ep_dict['pose'].append([
+                    ev_transform.location.x,
+                    ev_transform.location.y,
+                    np.deg2rad(ev_transform.rotation.yaw)
+                ])
+
+                # Comando de alta ordem (RoadOption) do próximo ponto da rota:
+                # -1 VOID, 1 LEFT, 2 RIGHT, 3 STRAIGHT, 4 LANEFOLLOW, 5/6 troca de faixa.
+                route_plan = env.env._ev_handler.ego_vehicles['hero'].route_plan
+                command = route_plan[0][1].value if len(route_plan) > 0 else 4
+                ep_dict['command'].append([command])
                 birdview = obs['birdview']
                 for i_mask in range(1):
                     birdview_mask = birdview[i_mask * 3: i_mask * 3 + 3]
@@ -143,7 +160,7 @@ if __name__ == '__main__':
 
                 ep_dict['state'].append(obs['state'])
 
-                obs, reward, done, info = env.step(action)
+                obs, reward, done, info = env.step(action) #executa a ação e avança a simulação
                 c_route = info['route_completion']['is_route_completed']
 
                 i_step += 1

@@ -28,7 +28,7 @@ def eval_bc(policy, device, env):
     ckpt_dir = Path('ckpt')
 
     ckpt_path = (ckpt_dir / 'ckpt_latest.pth').as_posix()
-    saved_variables = th.load(ckpt_path, map_location='cuda')
+    saved_variables = th.load(ckpt_path, map_location=device)
 
     policy.load_state_dict(saved_variables['policy_state_dict'])
 
@@ -68,11 +68,12 @@ if __name__ == '__main__':
         'distribution_entry_point': 'distributions:BetaDistribution',
     }
 
-    device = 'cuda'
+    device = 'cuda' if th.cuda.is_available() else 'cpu'
 
     policy = AgentPolicy(**policy_kwargs)
     policy.to(device)
 
     batch_size = 24
+    print ("aqui")
 
     eval_bc(policy, device, env)

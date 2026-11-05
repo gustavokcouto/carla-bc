@@ -12,6 +12,19 @@ from carla_gym.core.obs_manager.obs_manager import ObsManagerBase
 from carla_gym.utils.traffic_light import TrafficLightHandler
 
 
+def _get_vehicle_bbox_labels():
+    # CORREÇÃO DE COMPATIBILIDADE: no CARLA 0.9.10, carla.CityObjectLabel.Vehicles
+    # agrupava todos os veículos num só rótulo. A partir da 0.9.14, esse rótulo foi
+    # dividido em vários (Car, Bus, Truck, Motorcycle, Bicycle, Rider, Train), e
+    # "Vehicles" deixou de existir. Isso deixa o código funcionando nas duas
+    # versões da API, independente de qual estiver instalada.
+    if hasattr(carla.CityObjectLabel, 'Vehicles'):
+        return [carla.CityObjectLabel.Vehicles]
+    labels = ['Car', 'Bus', 'Truck', 'Motorcycle', 'Bicycle', 'Rider', 'Train']
+    return [getattr(carla.CityObjectLabel, name) for name in labels
+            if hasattr(carla.CityObjectLabel, name)]
+
+
 COLOR_BLACK = (0, 0, 0)
 COLOR_RED = (255, 0, 0)
 COLOR_GREEN = (0, 255, 0)
@@ -118,7 +131,9 @@ class ObsManager(ObsManagerBase):
             c_ev = abs(ev_loc.x - w.location.x) < 1.0 and abs(ev_loc.y - w.location.y) < 1.0
             return c_distance and (not c_ev)
 
-        vehicle_bbox_list = self._world.get_level_bbs(carla.CityObjectLabel.Vehicles)
+        vehicle_bbox_list = []
+        for vehicle_label in _get_vehicle_bbox_labels():
+            vehicle_bbox_list += self._world.get_level_bbs(vehicle_label)
         walker_bbox_list = self._world.get_level_bbs(carla.CityObjectLabel.Pedestrians)
         if self._scale_bbox:
             vehicles = self._get_surrounding_actors(vehicle_bbox_list, is_within_distance, 1.0)

@@ -188,7 +188,7 @@ class EgoVehicleHandler(object):
                 info_dict[ev_id]['episode_stat'] = {
                     'score_route': score_route,
                     'score_penalty': score_penalty,
-                    'score_composed': max(score_route*score_penalty, 0.0),
+                    'score_composed': max(score_route*score_penalty, 0.0),  # driving score
                     'length': len(self.reward_buffers[ev_id]),
                     'reward': np.sum(self.reward_buffers[ev_id]),
                     'timeout': float(info['timeout']),

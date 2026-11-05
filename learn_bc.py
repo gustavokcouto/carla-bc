@@ -28,7 +28,7 @@ def learn_bc(policy, device, expert_loader, eval_loader, resume_last_train):
         wandb_run = api.run(wb_run_path)
         wandb_run_id = wandb_run.id
         ckpt_path = (ckpt_dir / 'ckpt_latest.pth').as_posix()
-        saved_variables = th.load(ckpt_path, map_location='cuda')
+        saved_variables = th.load(ckpt_path, map_location=device)
         train_kwargs = saved_variables['train_init_kwargs']
         start_ep = train_kwargs['start_ep']
         i_steps = train_kwargs['i_steps']
@@ -46,7 +46,7 @@ def learn_bc(policy, device, expert_loader, eval_loader, resume_last_train):
     video_path.mkdir(parents=True, exist_ok=True)
 
     optimizer = optim.Adam(policy.parameters(), lr=1e-5)
-    episodes = 200
+    episodes = 200 #alterado para testes, episodes = 3
     ent_weight = 0.01
     min_eval_loss = np.inf
     eval_step = int(1e5)
@@ -144,7 +144,7 @@ if __name__ == '__main__':
         'distribution_entry_point': 'distributions:BetaDistribution',
     }
 
-    device = 'cuda'
+    device = 'cuda' if th.cuda.is_available() else 'cpu'
 
     policy = AgentPolicy(**policy_kwargs)
     policy.to(device)
@@ -154,7 +154,7 @@ if __name__ == '__main__':
     gail_train_loader = th.utils.data.DataLoader(
         ExpertDataset(
             'gail_experts',
-            n_routes=8,
+            n_routes=8, #alterado para testes n_routes = 1
             n_eps=1,
         ),
         batch_size=batch_size,
@@ -164,9 +164,9 @@ if __name__ == '__main__':
     gail_val_loader = th.utils.data.DataLoader(
         ExpertDataset(
             'gail_experts',
-            n_routes=2,
+            n_routes=2, #alterado para testes n_routes = 1
             n_eps=1,
-            route_start=8
+            route_start=8 #alterado para testes, n_routes = 1
         ),
         batch_size=batch_size,
         shuffle=True,
